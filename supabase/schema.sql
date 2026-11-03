@@ -34,6 +34,7 @@ create table goals (
   title        text not null,
   tag          text,                      -- ADDED: small label shown on goal cards (e.g. "Certification")
   notes        text,
+  deadline     date,                      -- ADDED: optional target date for the goal
   position     int  not null default 0,
   sprint_id    uuid references sprints(id) on delete set null,
   archived_at  timestamptz,               -- archive instead of delete
@@ -48,13 +49,16 @@ create table steps (
   goal_id       uuid not null references goals(id) on delete cascade,
   title         text not null,
   estimate_min  int  check (estimate_min > 0),   -- used to size time blocks
+  freq_period   text not null default 'once' check (freq_period in ('once','day','week','month')),  -- ADDED: how often this to-do repeats
+  freq_count    int  not null default 1 check (freq_count between 1 and 31),                        -- ADDED: times per period (3 + 'week' = 3x a week)
   position      int  not null default 0,
   done_at       timestamptz,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
 
--- PLAN_ITEMS: a step scheduled onto a specific day, as a time block
+-- PLAN_ITEMS: a step scheduled onto a specific day, as a time block.
+-- The app also uses a row with done_at set as the completion log for repeating to-dos.
 create table plan_items (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
