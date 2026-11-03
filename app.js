@@ -120,7 +120,7 @@ function goalCard(g){
   '<div class="dl"><label>Deadline <input type="date" data-dl="1" data-g="'+esc(g.id)+'" value="'+esc(g.deadline||"")+'"></label>'+(g.deadline?'<span class="fqchip'+(daysLeft(g.deadline)<0?' over':'')+'">'+dlLabel(g.deadline)+'</span>':'')+'</div><ul>'+
   g.tasks.map(function(t,i){
     var id=g.id+"-"+i,c=checked(t),p=prog(t);
-    var li='<li class="'+(c?'done':'')+'"><input type="checkbox" id="'+id+'" data-g="'+esc(g.id)+'" data-i="'+i+'"'+(c?' checked':'')+'><label for="'+id+'">'+esc(t.t)+(p?'<small class="sub2">'+p+'</small>':'')+'</label><button class="fqchip" data-act="editfq" data-t="'+esc(t.id)+'" aria-label="Change how often">'+fLabel(t)+'</button></li>';
+    var li='<li class="'+(c?'done':'')+'"><input type="checkbox" id="'+id+'" data-g="'+esc(g.id)+'" data-i="'+i+'"'+(c?' checked':'')+'><label for="'+id+'">'+esc(t.t)+(p?'<small class="sub2">'+p+'</small>':'')+'</label><button class="fqchip" data-act="editfq" data-t="'+esc(t.id)+'" aria-label="Change how often">'+fLabel(t)+'</button><button class="x" data-act="deltask" data-g="'+esc(g.id)+'" data-i="'+i+'" data-t="'+esc(t.id)+'" aria-label="Delete task">×</button></li>';
     if(editing===t.id)li+='<li class="fqrow">'+fqEditor(g,i,t)+'</li>';
     return li}).join("")+
   '</ul><div class="add"><input data-newtask="'+esc(g.id)+'" placeholder="Add a task" maxlength="100"><button data-act="addtask" data-g="'+esc(g.id)+'" aria-label="Add task">+</button></div></article>';
@@ -154,6 +154,7 @@ document.addEventListener("click",function(e){
   else if(a==="addgoal"){var v=document.getElementById("ng").value.trim();if(!v)return;var ng={id:newId(),title:v,tag:document.getElementById("nt").value.trim(),tasks:[]},dv=document.getElementById("nd").value;if(dv)ng.deadline=dv;state[tab].push(ng);adding=false;persist(ng);render()}
   else if(a==="delgoal"){var did=b.dataset.g;state[tab]=state[tab].filter(function(g){return g.id!==did});delete dirty["g:"+did];mark("d:"+did,{type:"del",id:did});flush();render()}
   else if(a==="addtask"){addTask(b.dataset.g)}
+  else if(a==="deltask"){var g=find(b.dataset.g);if(g){g.tasks.splice(+b.dataset.i,1);persist(g);render()}}
   else if(a==="editfq"){editing=editing===b.dataset.t?null:b.dataset.t;render()}
   else if(a==="theme"){var r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark"}
 });
