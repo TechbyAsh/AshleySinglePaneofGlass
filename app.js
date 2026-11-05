@@ -24,7 +24,7 @@ var SEED={
   family:[]
 };
 var WINS=["CompTIA CySA+","CompTIA Security+","Per Scholas Cybersecurity Analyst","Forage: AIG Shields Up","Forage: Deloitte Cyber Simulation"];
-var state={career:[],personal:[],family:[]},tab="home",adding=false,editing=null,LOG={};
+var state={career:[],personal:[],family:[]},tab="home",adding=false,editing=null,LOG={},SKIP={};
 /*ENGINE*/
 // Unsaved-changes tracker: every write is marked dirty, saved, and cleared only if
 // nothing newer was marked meanwhile. Failures keep the entry, flag it, and retry
@@ -80,10 +80,11 @@ function lday(iso){var d=new Date(iso);return d.getFullYear()+"-"+String(d.getMo
 function pstart(p){var o=0,n=new Date();if(p==="week")o=-((n.getDay()+6)%7);else if(p==="month")o=1-n.getDate();return dayKey(o)}
 function cnt(t,p){var s=pstart(p),e=dayKey(0);return (LOG[t.id]||[]).filter(function(x){return x>=s&&x<=e}).length}
 function doneToday(t){return (LOG[t.id]||[]).indexOf(dayKey(0))>-1}
+function skippedToday(t){return (SKIP[t.id]||[]).indexOf(dayKey(0))>-1}
 function onceToday(t){return !!(t.d&&t.doneAt&&lday(t.doneAt)===dayKey(0))}
 function checked(t){return fq(t).p==="once"?!!t.d:doneToday(t)}
 function quotaMet(t){var f=fq(t);return f.p==="once"?!!t.d:f.p==="day"?doneToday(t):cnt(t,f.p)>=f.n}
-function dueToday(t){var f=fq(t);if(f.p==="once")return !t.d||onceToday(t);if(f.p==="day")return true;return cnt(t,f.p)<f.n||doneToday(t)}
+function dueToday(t){if(skippedToday(t))return false;var f=fq(t);if(f.p==="once")return !t.d||onceToday(t);if(f.p==="day")return true;return cnt(t,f.p)<f.n||doneToday(t)}
 function fLabel(t){var f=fq(t);if(f.p==="once")return "One-time";if(f.p==="day")return "Daily";if(f.n>1)return f.n+"×/"+(f.p==="week"?"wk":"mo");return f.p==="week"?"Weekly":"Monthly"}
 function prog(t){var f=fq(t);return f.p==="week"||f.p==="month"?Math.min(cnt(t,f.p),f.n)+"/"+f.n+" this "+f.p:""}
 function daysLeft(d){return Math.round((new Date(d+"T12:00")-new Date(dayKey(0)+"T12:00"))/864e5)}
@@ -100,7 +101,7 @@ function ring(p){var r=44,c=2*Math.PI*r;return '<div class="ring"><svg viewBox="
 function secName(id){return SECTIONS.filter(function(s){return s.id===id})[0].name}
 function todayItems(){var out=[];SECTIONS.forEach(function(s){state[s.id].forEach(function(g){g.tasks.forEach(function(t,i){if(dueToday(t))out.push({s:s.id,g:g,t:t,i:i})})})});return out}
 function urg(a,b){var x=a.g.deadline||"9999",y=b.g.deadline||"9999";return x<y?-1:x>y?1:0}
-function trow(x){var t=x.t,id="h"+t.id,c=checked(t),p=prog(t);return '<li class="'+(c?'done':'')+'"><input type="checkbox" id="'+id+'" data-s="'+x.s+'" data-g="'+esc(x.g.id)+'" data-i="'+x.i+'"'+(c?' checked':'')+'><label for="'+id+'">'+esc(t.t)+'<small class="sub2">'+esc(x.g.title)+' · '+secName(x.s)+(p?' · '+p:'')+'</small></label><span class="fqchip">'+fLabel(t)+'</span></li>'}
+function trow(x){var t=x.t,id="h"+t.id,c=checked(t),p=prog(t);return '<li class="'+(c?'done':'')+'"><input type="checkbox" id="'+id+'" data-s="'+x.s+'" data-g="'+esc(x.g.id)+'" data-i="'+x.i+'"'+(c?' checked':'')+'><label for="'+id+'">'+esc(t.t)+'<small class="sub2">'+esc(x.g.title)+' · '+secName(x.s)+(p?' · '+p:'')+'</small></label><span class="fqchip">'+fLabel(t)+'</span><button class="x" data-act="skiptask" data-t="'+esc(t.id)+'" aria-label="Skip for today">×</button></li>'}
 function homeHTML(items){
   var open=items.filter(function(x){return !checked(x.t)}).sort(urg),done=items.filter(function(x){return checked(x.t)});
   var h='<div class="head"><h2>Today</h2></div>';
@@ -155,6 +156,7 @@ document.addEventListener("click",function(e){
   else if(a==="delgoal"){var did=b.dataset.g;state[tab]=state[tab].filter(function(g){return g.id!==did});delete dirty["g:"+did];mark("d:"+did,{type:"del",id:did});flush();render()}
   else if(a==="addtask"){addTask(b.dataset.g)}
   else if(a==="deltask"){var g=find(b.dataset.g);if(g){g.tasks.splice(+b.dataset.i,1);persist(g);render()}}
+  else if(a==="skiptask"){var tid=b.dataset.t,k=dayKey(0),a2=SKIP[tid]||(SKIP[tid]=[]),ix=a2.indexOf(k),skipped=ix<0;if(skipped){a2.push(k)}else{a2.splice(ix,1)}store.saveSkip(tid,k,skipped).catch(fail);render()}
   else if(a==="editfq"){editing=editing===b.dataset.t?null:b.dataset.t;render()}
   else if(a==="theme"){var r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark"}
 });
@@ -237,6 +239,7 @@ async function load(){
   }else state=group(rows);
   CK=await store.loadCheckins();
   LOG=await store.loadLog();
+  SKIP=await store.loadSkip();
   for(var sk in state)state[sk].forEach(function(g){var ch=false;g.tasks.forEach(function(t){if(!t.id){t.id=newId();ch=true}});if(ch)persist(g,sk)});
 }
 var wired=false;

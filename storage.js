@@ -3,7 +3,7 @@
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 
 const SB_ESM = "https://esm.sh/@supabase/supabase-js@2.45.4";
-const K = { v1: "goals-dash-v1", goals: "goals-dash-v2:goals", checkins: "goals-checkins-v1", seeded: "goals-dash-v2:seeded", log: "goals-dash-v2:log" };
+const K = { v1: "goals-dash-v1", goals: "goals-dash-v2:goals", checkins: "goals-checkins-v1", seeded: "goals-dash-v2:seeded", log: "goals-dash-v2:log", skip: "goals-dash-v2:skip" };
 let sb = null, user = null;
 
 const lsGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
@@ -35,6 +35,12 @@ const local = {
     const log = lsGet(K.log, {}), a = (log[step] || []).filter((d) => d !== date);
     if (done) a.push(date);
     log[step] = a; lsSet(K.log, log);
+  },
+  async loadSkip() { return lsGet(K.skip, {}); },
+  async saveSkip(step, date, skipped) {
+    const skip = lsGet(K.skip, {}), a = (skip[step] || []).filter((d) => d !== date);
+    if (skipped) a.push(date);
+    skip[step] = a; lsSet(K.skip, skip);
   },
 };
 
@@ -89,33 +95,54 @@ const cloud = {
   async saveCompletion(step, date, done) {
     ok(await sb.from("plan_items").upsert({ user_id: user.id, step_id: step, plan_date: date, done_at: done ? new Date().toISOString() : null }, { onConflict: "plan_date,step_id,user_id" }));
   },
+  // Skip tracking: use plan_items with a special step_id prefix "skip:" to avoid conflicts
+  async loadSkip() {
+    const since = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10);
+    const r = await sb.from("plan_items").select("step_id,plan_date").like("step_id", "skip:%").gte("plan_date", since); ok(r);
+    const out = {};
+    for (const x of r.data) {
+      const realStepId = x.step_id.replace("skip:", "");
+      (out[realStepId] ??= []).push(x.plan_date);
+    }
+    return out;
+  },
+  async saveSkip(step, date, skipped) {
+    const skipStepId = "skip:" + step;
+    if (skipped) {
+      ok(await sb.from("plan_items").upsert({ user_id: user.id, step_id: skipStepId, plan_date: date, done_at: new Date().toISOString() }, { onConflict: "plan_date,step_id,user_id" }));
+    } else {
+      ok(await sb.from("plan_items").delete().eq("step_id", skipStepId).eq("plan_date", date));
+    }
+  },
   async isSeeded() { return !!user.user_metadata?.seeded; },
   async markSeeded() { const r = await sb.auth.updateUser({ data: { seeded: true } }); ok(r); user = r.data.user; },
 };
 
 // Cloud ids must be UUIDs. Older local data used ids like "c1"; remap them (and the
 // goal references inside check-ins) so nothing dangles.
-function normalizeIds({ goals = [], checkins = {}, log = {} }) {
+function normalizeIds({ goals = [], checkins = {}, log = {}, skip = {} }) {
   const map = {};
   const rid = (id) => (UUID.test(id) ? id : (map[id] ??= uuid()));
   return {
     goals: goals.map((g) => ({ ...g, id: rid(g.id), tasks: (g.tasks || []).map((t) => ({ ...t, id: t.id ? rid(t.id) : uuid() })) })),
     checkins: Object.fromEntries(Object.entries(checkins).map(([day, d]) => [day, d.goals ? { ...d, goals: d.goals.map(rid) } : d])),
     log: Object.fromEntries(Object.entries(log).map(([sid, dates]) => [rid(sid), dates])),
+    skip: Object.fromEntries(Object.entries(skip).map(([sid, dates]) => [rid(sid), dates])),
   };
 }
 async function bulkWrite(impl, data) {
-  const { goals = [], checkins = {}, log = {} } = impl === cloud ? normalizeIds(data) : data;
+  const { goals = [], checkins = {}, log = {}, skip = {} } = impl === cloud ? normalizeIds(data) : data;
   for (const g of goals) await impl.saveGoal(g.section, g, g.position ?? 0);   // goals/steps first: completions reference steps
   for (const [day, d] of Object.entries(checkins)) await impl.saveCheckin(day, d);
   for (const [sid, dates] of Object.entries(log)) for (const day of dates) await impl.saveCompletion(sid, day, true);
+  for (const [sid, dates] of Object.entries(skip)) for (const day of dates) await impl.saveSkip(sid, day, true);
 }
 // First cloud sign-in: carry over anything already saved in this browser.
 async function importLocalOnce() {
   if (await cloud.isSeeded()) return;
-  const goals = localGoals(), checkins = lsGet(K.checkins, {}), log = lsGet(K.log, {});
+  const goals = localGoals(), checkins = lsGet(K.checkins, {}), log = lsGet(K.log, {}), skip = lsGet(K.skip, {});
   if (!goals.length && !Object.keys(checkins).length) return;
-  await bulkWrite(cloud, { goals, checkins, log });
+  await bulkWrite(cloud, { goals, checkins, log, skip });
   await cloud.markSeeded();
 }
 
@@ -149,10 +176,12 @@ export const store = {
   deleteGoal: (id) => impl().deleteGoal(id),
   loadCheckins: () => impl().loadCheckins(),
   loadLog: () => impl().loadLog(),
+  loadSkip: () => impl().loadSkip(),
   saveCompletion: (step, date, done) => impl().saveCompletion(step, date, done),
+  saveSkip: (step, date, skipped) => impl().saveSkip(step, date, skipped),
   saveCheckin: (day, d) => impl().saveCheckin(day, d),
   isSeeded: () => impl().isSeeded(),
   markSeeded: () => impl().markSeeded(),
-  async exportData() { return { goals: await impl().loadGoals(), checkins: await impl().loadCheckins(), log: await impl().loadLog() }; },
+  async exportData() { return { goals: await impl().loadGoals(), checkins: await impl().loadCheckins(), log: await impl().loadLog(), skip: await impl().loadSkip() }; },
   importData: (d) => bulkWrite(impl(), d),
 };
