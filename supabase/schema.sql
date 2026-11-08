@@ -53,6 +53,7 @@ create table steps (
   freq_count    int  not null default 1 check (freq_count between 1 and 31),                        -- ADDED: times per period (3 + 'week' = 3x a week)
   position      int  not null default 0,
   done_at       timestamptz,
+  skipped_at    timestamptz,               -- ADDED: timestamp when task was skipped for today
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );

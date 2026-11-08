@@ -24,7 +24,7 @@ var SEED={
   family:[]
 };
 var WINS=["CompTIA CySA+","CompTIA Security+","Per Scholas Cybersecurity Analyst","Forage: AIG Shields Up","Forage: Deloitte Cyber Simulation"];
-var state={career:[],personal:[],family:[]},tab="home",adding=false,editing=null,LOG={},SKIP={};
+var state={career:[],personal:[],family:[]},tab="home",adding=false,editing=null,LOG={};
 /*ENGINE*/
 // Unsaved-changes tracker: every write is marked dirty, saved, and cleared only if
 // nothing newer was marked meanwhile. Failures keep the entry, flag it, and retry
@@ -80,7 +80,7 @@ function lday(iso){var d=new Date(iso);return d.getFullYear()+"-"+String(d.getMo
 function pstart(p){var o=0,n=new Date();if(p==="week")o=-((n.getDay()+6)%7);else if(p==="month")o=1-n.getDate();return dayKey(o)}
 function cnt(t,p){var s=pstart(p),e=dayKey(0);return (LOG[t.id]||[]).filter(function(x){return x>=s&&x<=e}).length}
 function doneToday(t){return (LOG[t.id]||[]).indexOf(dayKey(0))>-1}
-function skippedToday(t){return (SKIP[t.id]||[]).indexOf(dayKey(0))>-1}
+function skippedToday(t){return !!(t.skippedAt&&lday(t.skippedAt)===dayKey(0))}
 function onceToday(t){return !!(t.d&&t.doneAt&&lday(t.doneAt)===dayKey(0))}
 function checked(t){return fq(t).p==="once"?!!t.d:doneToday(t)}
 function quotaMet(t){var f=fq(t);return f.p==="once"?!!t.d:f.p==="day"?doneToday(t):cnt(t,f.p)>=f.n}
@@ -156,7 +156,7 @@ document.addEventListener("click",function(e){
   else if(a==="delgoal"){var did=b.dataset.g;state[tab]=state[tab].filter(function(g){return g.id!==did});delete dirty["g:"+did];mark("d:"+did,{type:"del",id:did});flush();render()}
   else if(a==="addtask"){addTask(b.dataset.g)}
   else if(a==="deltask"){var g=find(b.dataset.g);if(g){g.tasks.splice(+b.dataset.i,1);persist(g);render()}}
-  else if(a==="skiptask"){var tid=b.dataset.t,k=dayKey(0),a2=SKIP[tid]||(SKIP[tid]=[]),ix=a2.indexOf(k),skipped=ix<0;if(skipped){a2.push(k)}else{a2.splice(ix,1)}store.saveSkip(tid,k,skipped).catch(fail);render()}
+  else if(a==="skiptask"){var tid=b.dataset.t;SECTIONS.forEach(function(s){state[s.id].forEach(function(g){var t=g.tasks.filter(function(x){return x.id===tid})[0];if(t){if(skippedToday(t)){delete t.skippedAt}else{t.skippedAt=new Date().toISOString()}persist(g,s.id);render()}})})}
   else if(a==="editfq"){editing=editing===b.dataset.t?null:b.dataset.t;render()}
   else if(a==="theme"){var r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark"}
 });
@@ -239,7 +239,6 @@ async function load(){
   }else state=group(rows);
   CK=await store.loadCheckins();
   LOG=await store.loadLog();
-  SKIP=await store.loadSkip();
   for(var sk in state)state[sk].forEach(function(g){var ch=false;g.tasks.forEach(function(t){if(!t.id){t.id=newId();ch=true}});if(ch)persist(g,sk)});
 }
 var wired=false;
