@@ -38,6 +38,7 @@ create table goals (
   position     int  not null default 0,
   sprint_id    uuid references sprints(id) on delete set null,
   archived_at  timestamptz,               -- archive instead of delete
+  completed_at timestamptz,               -- ADDED: timestamp when goal was marked complete
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );

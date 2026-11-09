@@ -2,7 +2,8 @@
 import { store } from "../storage.js";
 import { esc, newId, dayKey } from "./utils.js";
 import { setLog, getLog, fq, checked, quotaMet, skippedToday } from "./scheduling.js";
-import { setState, getState, setTab, getTab, setEditing, getEditing, find, addTask, toggleTask, pct, totals, goalCard } from "./goals.js";
+import { setState, getState, setTab, getTab, setEditing, getEditing, find, addTask, toggleTask, pct, totals, goalCard, toggleGoalComplete, isGoalComplete } from "./goals.js";
+import { triggerConfetti } from "./confetti.js";
 import { setCheckins, getCheckins, setCheckinState, getCheckinState, streak, lipText, ciSteps, layer, grab, finish, toggle } from "./checkin.js";
 import { todayItems, homeHTML, secName } from "./home.js";
 import { syncUI, syncText, bannerHTML, fail, mark, persist, flush, getDirty, clearDirty, hasDirty, setSaveEntryHandler } from "./engine.js";
@@ -147,6 +148,30 @@ document.addEventListener("click", function(e) {
         }
       })
     })
+  } else if (a === "completegoal") {
+    var g = find(b.dataset.g);
+    if (g) {
+      toggleGoalComplete(g);
+      persist(g, getTab());
+      triggerConfetti();
+      render()
+    }
+  } else if (a === "uncompletegoal") {
+    var g = find(b.dataset.g);
+    if (g) {
+      toggleGoalComplete(g);
+      persist(g, getTab());
+      render()
+    }
+  } else if (a === "togglecompleted") {
+    var section = document.getElementById("completedSection");
+    var btn = b;
+    if (section) {
+      var isHidden = section.style.display === "none";
+      section.style.display = isHidden ? "block" : "none";
+      btn.textContent = isHidden ? "Hide" : "Show";
+      btn.setAttribute("aria-expanded", isHidden);
+    }
   } else if (a === "editfq") {
     setEditing(getEditing() === b.dataset.t ? null : b.dataset.t);
     render()
@@ -164,6 +189,9 @@ document.addEventListener("change", function(e) {
       if (result.type === "goal") persist(find(d.g), d.s || getTab());
       else mark("l:"+result.step+"|"+result.date, result);
       flush();
+      if (result.autoCompleted) {
+        triggerConfetti();
+      }
       render()
     }
     return

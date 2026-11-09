@@ -51,10 +51,10 @@ const cloud = {
     const s = await sb.from("steps").select("*").order("position"); ok(s);
     const by = {};
     for (const r of s.data) (by[r.goal_id] ??= []).push({ id: r.id, t: r.title, d: !!r.done_at, doneAt: r.done_at || undefined, skippedAt: r.skipped_at || undefined, freq: { p: r.freq_period || "once", n: r.freq_count || 1 } });
-    return g.data.map((r) => ({ id: r.id, section: r.category, title: r.title, tag: r.tag || "", deadline: r.deadline || undefined, position: r.position, tasks: by[r.id] || [] }));
+    return g.data.map((r) => ({ id: r.id, section: r.category, title: r.title, tag: r.tag || "", deadline: r.deadline || undefined, position: r.position, completed: !!r.completed_at, completedAt: r.completed_at || undefined, tasks: by[r.id] || [] }));
   },
   async saveGoal(section, g, position) {
-    ok(await sb.from("goals").upsert({ id: g.id, user_id: user.id, category: section, title: g.title, tag: g.tag || null, deadline: g.deadline || null, position }));
+    ok(await sb.from("goals").upsert({ id: g.id, user_id: user.id, category: section, title: g.title, tag: g.tag || null, deadline: g.deadline || null, position, completed_at: g.completedAt || null }));
     const tasks = g.tasks || [];
     const rows = tasks.map((t, i) => {
       if (!t.id) t.id = uuid();

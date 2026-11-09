@@ -144,3 +144,151 @@ button.fqchip:hover{background:var(--blush)}
 .dl label{display:flex;align-items:center;gap:8px}
 .tlist{padding:4px 18px 8px;border-radius:26px}
 .tlist li:first-child{border-top:0}
+
+/* Goal Completion Styles */
+.goal.completed {
+  opacity: 0.7;
+  background: var(--sunk);
+}
+
+.goal.completed h3 {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.goal.completed .bar i {
+  background: var(--faint);
+}
+
+.goal.completed .pct {
+  color: var(--faint);
+}
+
+.goal-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.complete-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--rose);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.complete-btn:hover {
+  background: var(--rose-deep);
+  transform: scale(1.1);
+}
+
+.goal.completed .complete-btn {
+  background: var(--faint);
+}
+
+.goal.completed .complete-btn:hover {
+  background: var(--muted);
+}
+
+/* Confetti Animation */
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.confetti {
+  position: absolute;
+  top: -10px;
+  animation: confetti-fall linear forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* Completed Goals Section */
+.completed-section {
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.completed-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.completed-goal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.completed-goal:last-child {
+  border-bottom: none;
+}
+
+.completed-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--rose);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.completed-info {
+  flex: 1;
+}
+
+.completed-info strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.completed-info .sub2 {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Disabled states for completed goals */
+.goal.completed input[type="checkbox"],
+.goal.completed .fqchip,
+.goal.completed .x,
+.goal.completed input[type="date"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.goal.completed .add {
+  display: none;
+}

@@ -52,5 +52,26 @@ export function homeHTML(items) {
   h += '<div class="head"><h2>Deadlines</h2></div><div class="card tlist">'+(dg.length ? '<ul>'+dg.slice(0,6).map(function(x){
     return '<li><label style="cursor:default">'+esc(x.g.title)+'<small class="sub2">'+secName(x.s)+'</small></label><span class="fqchip'+(daysLeft(x.g.deadline)<0?' over':'')+'">'+dlLabel(x.g.deadline)+'</span></li>'
   }).join("")+'</ul>' : '<p class="sub2" style="padding:12px 0;margin:0">Set a deadline on any goal and it will show up here.</p>')+'</div>';
-  return h + '<div class="head"><h2>Check-ins</h2></div>' + weekCard()
+  h += '<div class="head"><h2>Check-ins</h2></div>' + weekCard();
+  
+  // Completed goals section
+  var completedGoals = [];
+  SECTIONS.forEach(function(s){
+    state[s.id].forEach(function(g){
+      if (g.completed) completedGoals.push({s:s.id, g:g})
+    })
+  });
+  completedGoals.sort(function(a,b){return new Date(b.g.completedAt) - new Date(a.g.completedAt)});
+  
+  if (completedGoals.length > 0) {
+    h += '<div class="head"><h2>Completed Goals</h2><button class="btn" data-act="togglecompleted" aria-expanded="false">Show</button></div>';
+    h += '<div class="card completed-section" id="completedSection" style="display:none">';
+    h += '<ul>';
+    completedGoals.forEach(function(x){
+      h += '<li class="completed-goal"><span class="completed-check">✓</span><div class="completed-info"><strong>'+esc(x.g.title)+'</strong><small class="sub2">'+secName(x.s)+' · Completed '+new Date(x.g.completedAt).toLocaleDateString()+'</small></div></li>';
+    });
+    h += '</ul></div>';
+  }
+  
+  return h
 }
